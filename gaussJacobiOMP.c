@@ -12,11 +12,10 @@
 #define MAX_K 1000000
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 double jacobiSequential(double *A, double *b, int n) {
-    double *x = (double *)calloc(n, sizeof(double));
-    double *phi = (double *)calloc(n, sizeof(double));
+    double *x = (double *)malloc(n * sizeof(double));
+    double *phi = (double *)malloc(n * sizeof(double));
 
     double *dA = (double *)malloc(n * n * sizeof(double)); // dA = D^(-1)C
     double *db = (double *)malloc(n * sizeof(double));     // db = D^(-1)b
@@ -25,6 +24,9 @@ double jacobiSequential(double *A, double *b, int n) {
     double dt;
 
     for (int i = 0; i < n; ++i) {
+        x[i] = 0.0;
+        phi[i] = 0.0;
+
         double d = A[i * n + i];
 
         for (int j = 0; j < n; ++j)
@@ -44,7 +46,7 @@ double jacobiSequential(double *A, double *b, int n) {
                 sum += dA[i * n + j] * x[j];
 
             phi[i] = db[i] - sum;
-            e = MAX(e, fabs(phi[i] - x[i]));
+            e = fmax(e, fabs(phi[i] - x[i]));
         }
 
         if (e <= EPSILON || k >= MAX_K)
@@ -67,8 +69,8 @@ double jacobiSequential(double *A, double *b, int n) {
 double jacobiParallel(double *A, double *b, int n, int max_threads) {
     const int NUM_THREADS = MIN(n, max_threads);
 
-    double *x = (double *)calloc(n, sizeof(double));
-    double *phi = (double *)calloc(n, sizeof(double));
+    double *x = (double *)malloc(n * sizeof(double));
+    double *phi = (double *)malloc(n * sizeof(double));
 
     double *dA = (double *)malloc(n * n * sizeof(double)); // dA = D^(-1)C
     double *db = (double *)malloc(n * sizeof(double));     // db = D^(-1)b
@@ -77,6 +79,9 @@ double jacobiParallel(double *A, double *b, int n, int max_threads) {
 
     #pragma omp parallel for num_threads(NUM_THREADS)
     for (int i = 0; i < n; ++i) {
+        x[i] = 0.0;
+        phi[i] = 0.0;
+
         double d = A[i * n + i];
 
         for (int j = 0; j < n; ++j)
@@ -89,7 +94,7 @@ double jacobiParallel(double *A, double *b, int n, int max_threads) {
     dt = omp_get_wtime();
     for (int k = 0;; ++k) {
         e = 0.0;
-        #pragma omp parallel for num_threads(NUM_THREADS)
+        #pragma omp parallel for num_threads(NUM_THREADS) reduction(max:e)
         for (int i = 0; i < n; ++i) {
             double sum = 0.0;
 
@@ -97,8 +102,7 @@ double jacobiParallel(double *A, double *b, int n, int max_threads) {
                 sum += dA[i * n + j] * x[j];
 
             phi[i] = db[i] - sum;
-            #pragma omp critical
-            e = MAX(e, fabs(phi[i] - x[i]));
+            e = fmax(e, fabs(phi[i] - x[i]));
         }
 
         if (e <= EPSILON || k >= MAX_K)
@@ -119,8 +123,8 @@ double jacobiParallel(double *A, double *b, int n, int max_threads) {
 }
 
 double seidelSequential(double *A, double *b, int n) {
-    double *x = (double *)calloc(n, sizeof(double));
-    double *phi = (double *)calloc(n, sizeof(double));
+    double *x = (double *)malloc(n * sizeof(double));
+    double *phi = (double *)malloc(n * sizeof(double));
 
     double *dA = (double *)malloc(n * n * sizeof(double)); // dA = D^(-1)C
     double *db = (double *)malloc(n * sizeof(double));     // db = D^(-1)b
@@ -129,6 +133,9 @@ double seidelSequential(double *A, double *b, int n) {
     double dt;
 
     for (int i = 0; i < n; ++i) {
+        x[i] = 0.0;
+        phi[i] = 0.0;
+
         double d = A[i * n + i];
 
         for (int j = 0; j < n; ++j)
@@ -151,7 +158,7 @@ double seidelSequential(double *A, double *b, int n) {
                 sum += dA[i * n + j] * x[j];
 
             phi[i] = db[i] - sum;
-            e = MAX(e, fabs(phi[i] - x[i]));
+            e = fmax(e, fabs(phi[i] - x[i]));
         }
 
         if (e <= EPSILON || k >= MAX_K)
@@ -222,11 +229,11 @@ int main(int argc, char *argv[]) {
 
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--max-threads"))
-            max_threads = atoi(argv[i + 1]);
+            max_threads = atoi(argv[++i]);
         if (!strcmp(argv[i], "--size"))
-            size = atoi(argv[i + 1]);
+            size = atoi(argv[++i]);
         if (!strcmp(argv[i], "--density"))
-            density = atof(argv[i + 1]);
+            density = atof(argv[++i]);
     }
 
     printf("Tipo de Matriz: %s (Densidade = %.f%%)\n"
